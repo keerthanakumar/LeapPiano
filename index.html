@@ -1,0 +1,493 @@
+<html>
+<head>
+  <title>Leap Piano</title>
+
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="">
+  <meta name="author" content="">
+  <link rel="icon" href="../../favicon.ico">
+
+  <title>Leap Piano</title>
+
+  <!-- Bootstrap core CSS -->
+  <link href="../../dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Custom styles for this template -->
+  <link href="cover.css" rel="stylesheet">
+
+  <!-- Just for debugging purposes. Don't actually copy these 2 lines! -->
+  <!--[if lt IE 9]><script src="../../assets/js/ie8-responsive-file-warning.js"></script><![endif]-->
+  <script src="../../assets/js/ie-emulation-modes-warning.js"></script>
+
+  <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+  <script src="../../assets/js/ie10-viewport-bug-workaround.js"></script>
+
+  <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+  <!--[if lt IE 9]>
+  <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+  <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+  <![endif]-->
+
+  <script src="//cdnjs.cloudflare.com/ajax/libs/three.js/r67/three.js"></script>
+  <script src="//js.leapmotion.com/leap-0.6.2.min.js"></script>
+  <script src="//js.leapmotion.com/leap-plugins-0.1.6.1.min.js"></script>
+  <script src="//js.leapmotion.com/leap.rigged-hand-0.1.4.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+  <script src="AudioDetect.js" type="text/javascript"></script>
+ <script src="LoadPlugin.js" type="text/javascript"></script>
+ <script src="Plugin.js" type="text/javascript"></script>
+ <script src="Player.js" type="text/javascript"></script>
+ <script src="DOMLoader.XMLHttp.js" type="text/javascript"></script>
+ <script src="Base64.js" type="text/javascript"></script>
+ <script src="base64binary.js" type="text/javascript"></script>
+  <link href="style.css" rel="stylesheet">
+</head>
+<body>
+
+</body>
+
+<script>
+  var baseBoneRotation = (new THREE.Quaternion).setFromEuler(
+      new THREE.Euler(Math.PI / 2, 0, 0)
+  );
+
+  var canvas;
+  var ctx;
+
+  var key_set = [24,26,28,29,31,33,35,36,38,40,41,43,45,47,48,50,52,53,55,57,59,60,62,64,65,67,69,71,72,74,76,77,79,81,83,84,86,88,89,91,93,95,96];
+
+  var base_set = false;
+  var base_position = 0;
+  var base_key = 28;
+  var diff = 0;
+    
+  var thumb = 0;
+  var index = 0;
+  var middle = 0;
+  var ring = 0;
+  var pinky = 0;
+
+  var c_chord = 0;
+  var a_chord = 0;
+  var g_chord = 0;
+  var f_chord = 0;
+
+  var basicnote = 60;
+
+  var set_base_function = function(hand){
+    var bp = hand.palmPosition;
+    base_position = bp[0];
+    console.log("Base Point Set");
+    base_set = true;
+  };
+
+  var reset_fingers = function(isLeft){
+    if(!isLeft){
+      thumb = 0;
+      index = 0;
+      middle = 0;
+      ring = 0;
+      pinky = 0;
+    }
+    else{
+      c_chord = 0;
+      a_chord = 0;
+      g_chord = 0;
+      f_chord = 0;
+    }
+  }
+
+  var playChord = function(chord){
+    var chord_array;
+    if (chord == "C"){
+      chord_array = [36,40,43];
+    }
+    else  if (chord == "A"){
+      chord_array = [33,36,40];
+    }
+    else  if (chord == "G"){
+      chord_array = [31,35,38];
+    }
+    else  if (chord == "F"){
+      chord_array = [29,33,36];
+    }
+    var delay = 0; // play one note every quarter second
+    var velocity = 60; // how hard the note hits
+    // play the note
+    MIDI.setVolume(0, 65);
+    MIDI.chordOn(1, chord_array, velocity, delay);
+    MIDI.chordOff(1, chord_array, delay + 2);
+  }
+
+  var playSound = function(notediff){
+    var delay = 0; // play one note every quarter second
+    var note = key_set[notediff]; // the MIDI note
+    var velocity = 127; // how hard the note hits
+    // play the note
+    MIDI.setVolume(0, 127);
+    MIDI.noteOn(0, note, velocity, delay);
+    MIDI.noteOff(0, note, delay + 0.75);
+  }
+
+  Leap.loop({background: true}, {
+    frame: function (frame) {
+
+      if (frame.hands.length > 0) {
+      for (var i = 0; i < frame.hands.length; i++) {
+        var hand = frame.hands[i];
+
+        if(hand.type == 'right'){
+
+          if(base_set == false){
+            set_base_function(hand);
+          }
+
+          var right_distance = hand.palmPosition[0] - base_position;
+          var dis = 30;
+          if(right_distance > dis){
+            diff = Math.floor(right_distance/dis);
+          } 
+          else if (right_distance <dis){
+            diff = Math.floor(right_distance/dis) + 1;
+          }
+          else {
+            diff = 0;
+          }
+
+          hand.fingers.forEach(function (finger) {
+            var rightSpeed = finger.tipVelocity;
+
+            
+            if(finger.type == 1 && rightSpeed[2] > 50){
+              index += 1;
+            } else if(finger.type == 1 && rightSpeed[2] < -45 && index >= 1) {
+              reset_fingers(false);
+              //index = 0;
+              change_letter(diff+1);
+              playSound(21+diff+1);
+            }
+            if(finger.type == 2 && rightSpeed[2] > 50){
+              middle += 1;
+            } else if(finger.type == 2 && rightSpeed[2] < -45 && middle >= 1) {
+              reset_fingers(false);
+              //middle = 0;
+              change_letter(diff+2);
+              playSound(21+diff+2);
+
+            }
+            if(finger.type == 0 && rightSpeed[2] > 18){
+              thumb += 1;
+            } else if(finger.type == 0 && rightSpeed[2] < -30 && thumb >= 1) {
+              reset_fingers(false);
+              //thumb = 0;
+              change_letter(diff);
+              playSound(21+diff);
+            }
+            if(finger.type == 3 && rightSpeed[2] > 50){
+              ring += 1;
+            } else if(finger.type == 3 && rightSpeed[2] < -45 && ring >= 1) {
+              reset_fingers(false);
+              //ring = 0;
+              change_letter(diff+3);
+              playSound(21+diff+3);
+            }
+            if(finger.type == 4 && rightSpeed[2] > 40){
+              pinky += 1;
+            } else if(finger.type == 4 && rightSpeed[2] < -40 && pinky >= 1) {
+              reset_fingers(false);
+              //pinky = 0;
+              change_letter(diff+4);
+              playSound(21+diff+4);
+            }
+          });
+
+        } else if(hand.type == 'left'){
+          hand.fingers.forEach(function (finger) {
+            var leftSpeed = finger.tipVelocity;
+
+            if(finger.type == 1 && leftSpeed[2] > 50){
+              c_chord += 1;
+            } else if(finger.type == 1 && leftSpeed[2] < -50 && c_chord >= 1) {
+              reset_fingers(true);
+              change_chord('C Major');
+              playChord('C');
+            }
+            if(finger.type == 2 && leftSpeed[2] > 50){
+              a_chord += 1;
+            } else if(finger.type == 2 && leftSpeed[2] < -50 && a_chord >= 1) {
+              reset_fingers(true);
+              change_chord('a minor');
+              playChord('A');
+
+            }
+            if(finger.type == 3 && leftSpeed[2] > 50){
+              g_chord += 1;
+            } else if(finger.type == 3 && leftSpeed[2] < -50 && g_chord >= 1) {
+              reset_fingers(true);
+              change_chord('G Major');
+              playChord('G');
+            }
+            if(finger.type == 4 && leftSpeed[2] > 50){
+              f_chord += 1;
+            } else if(finger.type == 4 && leftSpeed[2] < -50 && f_chord >= 1) {
+              reset_fingers(true);
+              change_chord('F Major');
+              playChord('F');
+            }
+          });
+        }
+
+          hand.fingers.forEach(function (finger) {
+
+            // This is the meat of the example - Positioning `the cylinders on every frame:
+            finger.data('boneMeshes').forEach(function(mesh, i){
+              var bone = finger.bones[i];
+
+              mesh.position.fromArray(bone.center());
+
+              mesh.setRotationFromMatrix(
+                  (new THREE.Matrix4).fromArray( bone.matrix() )
+              );
+
+              mesh.quaternion.multiply(baseBoneRotation);
+            });
+
+            finger.data('jointMeshes').forEach(function(mesh, i){
+              var bone = finger.bones[i];
+
+              if (bone) {
+                mesh.position.fromArray(bone.prevJoint);
+              }else{
+                // special case for the finger tip joint sphere:
+                bone = finger.bones[i-1];
+                mesh.position.fromArray(bone.nextJoint);
+              }
+
+            });
+
+          });
+        }       
+      }
+      renderer.render(scene, camera);
+
+  }})
+    // these two LeapJS plugins, handHold and handEntry are available from leapjs-plugins, included above.
+    // handHold provides hand.data
+    // handEntry provides handFound/handLost events.
+  .use('handHold')
+  .use('handEntry')
+  .on('handFound', function(hand){
+
+    hand.fingers.forEach(function (finger) {
+
+      var boneMeshes = [];
+      var jointMeshes = [];
+
+      finger.bones.forEach(function(bone) {
+
+        // create joints
+
+        // CylinderGeometry(radiusTop, radiusBottom, height, radiusSegments, heightSegments, openEnded)
+        var boneMesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(5, 5, bone.length),
+            new THREE.MeshPhongMaterial()
+        );
+
+        boneMesh.material.color.setHex(0xffffff);
+        scene.add(boneMesh);
+        boneMeshes.push(boneMesh);
+      });
+
+      for (var i = 0; i < finger.bones.length + 1; i++) {
+
+        var jointMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(8),
+            new THREE.MeshPhongMaterial()
+        );
+
+        jointMesh.material.color.setHex(0x0088ce);
+        scene.add(jointMesh);
+        jointMeshes.push(jointMesh);
+
+      }
+
+
+      finger.data('boneMeshes', boneMeshes);
+      finger.data('jointMeshes', jointMeshes);
+
+    });
+
+  })
+  .on('handLost', function(hand){
+
+    hand.fingers.forEach(function (finger) {
+
+      var boneMeshes = finger.data('boneMeshes');
+      var jointMeshes = finger.data('jointMeshes');
+
+      boneMeshes.forEach(function(mesh){
+        scene.remove(mesh);
+      });
+
+      jointMeshes.forEach(function(mesh){
+        scene.remove(mesh);
+      });
+
+      finger.data({
+        boneMeshes: null,
+        boneMeshes: null
+      });
+
+    });
+
+    renderer.render(scene, camera);
+
+  })
+  .use('playback', {
+    // This is a compressed JSON file of preprecorded frame data
+    recording: './scroll-and-swipe-100fps.json.lz',
+    // How long, in ms, between repeating the recording.
+    timeBetweenLoops: 2000,
+    pauseOnHand: true
+  })
+  .connect();
+
+
+  // all units in mm
+  var initScene = function () {
+    window.scene = new THREE.Scene();
+    window.renderer = new THREE.WebGLRenderer({
+      alpha: true
+    });
+
+    window.renderer.setClearColor(0x000000, 0);
+    window.renderer.setSize(window.innerWidth, window.innerHeight);
+
+    window.renderer.domElement.style.position = 'fixed';
+    window.renderer.domElement.style.top = 0;
+    window.renderer.domElement.style.left = 0;
+    window.renderer.domElement.style.width = '100%';
+    window.renderer.domElement.style.height = '100%';
+
+    document.body.appendChild(window.renderer.domElement);
+
+    var directionalLight = new THREE.DirectionalLight( 0xffffff, 1 );
+    directionalLight.position.set( 0, 0.5, 1 );
+    window.scene.add(directionalLight);
+
+    window.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
+    window.camera.position.fromArray([0, 150, 700]);
+    window.camera.lookAt(new THREE.Vector3(0, 160, 0));
+
+    window.addEventListener('resize', function () {
+
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.render(scene, camera);
+
+    }, false);
+
+    scene.add(camera);
+
+
+    renderer.render(scene, camera);
+  };
+
+  initScene();
+
+  //Some drawing dots thing  
+  $(document).ready(function() { 
+    canvas = document.getElementById("myCanvas");
+    ctx = canvas.getContext("2d");
+    canvas.width = 900;
+    canvas.height = 100;
+
+    MIDI.loadPlugin({
+      soundfontUrl: "./soundfont/",
+      instrument: "acoustic_grand_piano",
+      callback: function() {}
+    });
+
+  });
+
+  var clear_dot = function() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  var move_dot = function(indexFromC) {
+    var middleC5 = 461;
+    var dot_y = 85;
+
+    var spacing = 21.4;
+
+    ctx.beginPath();
+    ctx.arc(middleC5 + indexFromC*spacing, dot_y, 5, 0, 2 * Math.PI, false);
+    ctx.fillStyle = 'red';
+    ctx.fill();
+  }
+
+  var change_letter = function(indexFromC) {
+    var scale = ['C','D','E','F','G','A','B'];
+    clear_dot();
+    realIndex = indexFromC%7;
+    if(realIndex < 0) {
+      realIndex = 7 + realIndex;
+    }
+    move_dot(indexFromC);
+
+    $('.note_text').html(scale[realIndex])
+  }
+
+  var change_chord = function(chordName) {
+    $('.chord').html(chordName)
+  }
+
+</script>
+
+ <body>
+
+    <div class="site-wrapper">
+
+      <div class="site-wrapper-inner">
+
+        <div class="cover-container">
+
+          <div class="masthead clearfix">
+            <div class="inner">
+              <h3 class="masthead-brand">Leap<span class='red'>Piano</span></h3>
+              <h1 class="cover-heading" id='head'>connect leap motion and play</h1>
+            </div>
+          </div>
+
+          <div class="inner cover">
+            <h1 class="cover-heading" id='head'></h1>
+            <p class="lead"><span class='note_text'>N</span><span class='chord'></span></p>
+            <p class='lead piano_holder'>
+              <canvas id="myCanvas"></canvas>
+              <img class='piano' src="/images/piano_noletter2.svg">
+            </p>
+
+          </div>
+
+          <div class="mastfoot">
+            <div class="inner">
+              <p>HackTX by Keerthana and Edmund</p>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="../../dist/js/bootstrap.min.js"></script>
+    <script src="../../assets/js/docs.min.js"></script>
+  </body>
+</html>
